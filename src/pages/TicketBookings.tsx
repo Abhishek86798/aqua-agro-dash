@@ -1,18 +1,11 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { motion } from "framer-motion";
-import { Search, Filter, Download, Eye, CheckCircle, XCircle } from "lucide-react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Label } from "@/components/ui/label";
+import { Calendar } from "@/components/ui/calendar";
 import {
   Select,
   SelectContent,
@@ -20,170 +13,372 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { CalendarIcon, Plus, Minus, Waves, Tractor, Star, CheckCircle } from "lucide-react";
+import { format } from "date-fns";
+import { cn } from "@/lib/utils";
+import heroImage from "@/assets/hero-booking.jpg";
 
-const bookingsData = [
-  { id: "TK001", name: "Sarah Johnson", type: "Water Park", date: "2024-01-15", amount: "$45", status: "confirmed", email: "sarah@email.com", guests: 2 },
-  { id: "TK002", name: "Mike Chen", type: "Combo Package", date: "2024-01-15", amount: "$120", status: "confirmed", email: "mike@email.com", guests: 4 },
-  { id: "TK003", name: "Emma Davis", type: "Agro Tour", date: "2024-01-14", amount: "$30", status: "cancelled", email: "emma@email.com", guests: 1 },
-  { id: "TK004", name: "Robert Wilson", type: "Water Park", date: "2024-01-14", amount: "$90", status: "confirmed", email: "robert@email.com", guests: 3 },
-  { id: "TK005", name: "Lisa Anderson", type: "Combo Package", date: "2024-01-13", amount: "$160", status: "confirmed", email: "lisa@email.com", guests: 5 },
-  { id: "TK006", name: "James Brown", type: "Agro Tour", date: "2024-01-13", amount: "$60", status: "confirmed", email: "james@email.com", guests: 2 },
-  { id: "TK007", name: "Maria Garcia", type: "Water Park", date: "2024-01-12", amount: "$45", status: "cancelled", email: "maria@email.com", guests: 1 },
-  { id: "TK008", name: "David Miller", type: "Combo Package", date: "2024-01-12", amount: "$200", status: "confirmed", email: "david@email.com", guests: 6 }
+// Mock ticket prices
+const ticketPrices = {
+  "water-park": { adult: 25, child: 15 },
+  "agro-tour": { adult: 20, child: 12 },
+  "combo": { adult: 40, child: 25 }
+};
+
+const ticketTypes = [
+  {
+    id: "water-park",
+    name: "Water Park Only",
+    description: "Access to all water rides and pools",
+    icon: Waves,
+    color: "water-blue"
+  },
+  {
+    id: "agro-tour",
+    name: "Agro Tour Only", 
+    description: "Farm activities and animal feeding",
+    icon: Tractor,
+    color: "agro-green"
+  },
+  {
+    id: "combo",
+    name: "Combo Package",
+    description: "Full access to water park + agro activities",
+    icon: Star,
+    color: "primary"
+  }
 ];
 
 export default function TicketBookings() {
-  const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [typeFilter, setTypeFilter] = useState("all");
+  const [ticketType, setTicketType] = useState("");
+  const [date, setDate] = useState<Date>();
+  const [adults, setAdults] = useState(1);
+  const [children, setChildren] = useState(0);
+  const [showBookingDialog, setShowBookingDialog] = useState(false);
+  const [bookingSuccess, setBookingSuccess] = useState(false);
 
-  const filteredBookings = bookingsData.filter(booking => {
-    const matchesSearch = booking.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         booking.id.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === "all" || booking.status === statusFilter;
-    const matchesType = typeFilter === "all" || booking.type === typeFilter;
-    return matchesSearch && matchesStatus && matchesType;
-  });
+  const totalPrice = ticketType && ticketPrices[ticketType as keyof typeof ticketPrices]
+    ? (adults * ticketPrices[ticketType as keyof typeof ticketPrices].adult) + 
+      (children * ticketPrices[ticketType as keyof typeof ticketPrices].child)
+    : 0;
 
-  const getStatusBadge = (status: string) => {
-    if (status === "confirmed") {
-      return <Badge className="bg-green-100 text-green-800 hover:bg-green-100"><CheckCircle className="w-3 h-3 mr-1" />Confirmed</Badge>;
-    }
-    return <Badge variant="destructive"><XCircle className="w-3 h-3 mr-1" />Cancelled</Badge>;
+  const handleBookNow = () => {
+    setShowBookingDialog(true);
+    setTimeout(() => {
+      setBookingSuccess(true);
+    }, 1000);
   };
 
-  const getTypeBadge = (type: string) => {
-    const colors = {
-      "Water Park": "bg-water-light text-water-blue border-water-blue/20",
-      "Agro Tour": "bg-agro-light text-agro-green border-agro-green/20",
-      "Combo Package": "bg-purple-100 text-purple-800 border-purple-200"
-    };
-    return <Badge className={colors[type as keyof typeof colors] || ""}>{type}</Badge>;
+  const resetForm = () => {
+    setTicketType("");
+    setDate(undefined);
+    setAdults(1);
+    setChildren(0);
+    setShowBookingDialog(false);
+    setBookingSuccess(false);
   };
+
+  const Counter = ({ label, value, onChange, min = 0 }: { 
+    label: string; 
+    value: number; 
+    onChange: (value: number) => void;
+    min?: number;
+  }) => (
+    <div className="flex items-center justify-between p-4 bg-muted/30 rounded-xl">
+      <Label className="font-medium">{label}</Label>
+      <div className="flex items-center gap-3">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="h-8 w-8 p-0 rounded-full"
+          onClick={() => onChange(Math.max(min, value - 1))}
+          disabled={value <= min}
+        >
+          <Minus className="h-4 w-4" />
+        </Button>
+        <span className="w-8 text-center font-semibold">{value}</span>
+        <Button
+          type="button"
+          variant="outline" 
+          size="sm"
+          className="h-8 w-8 p-0 rounded-full"
+          onClick={() => onChange(value + 1)}
+        >
+          <Plus className="h-4 w-4" />
+        </Button>
+      </div>
+    </div>
+  );
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
+    <div className="min-h-screen bg-gradient-to-br from-background to-muted/20">
+      {/* Hero Banner */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3 }}
+        transition={{ duration: 0.8 }}
+        className="relative h-[400px] rounded-2xl overflow-hidden mb-8"
       >
-        <h1 className="text-3xl font-bold text-foreground">Ticket Bookings</h1>
-        <p className="text-muted-foreground">Manage and track all visitor bookings</p>
+        <img 
+          src={heroImage} 
+          alt="Water & Agro Park" 
+          className="w-full h-full object-cover"
+        />
+        <div className="absolute inset-0 bg-gradient-to-r from-primary/80 to-water-blue/60" />
+        <div className="absolute inset-0 flex items-center justify-center text-center">
+          <div className="text-white space-y-4">
+            <motion.h1 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3, duration: 0.6 }}
+              className="text-5xl md:text-6xl font-bold"
+            >
+              Book Your Adventure
+            </motion.h1>
+            <motion.p 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.5, duration: 0.6 }}
+              className="text-xl md:text-2xl text-white/90"
+            >
+              Experience the perfect blend of water fun and farm life
+            </motion.p>
+          </div>
+        </div>
       </motion.div>
 
-      {/* Filters */}
+      {/* Booking Form */}
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
+        initial={{ opacity: 0, y: 40 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1, duration: 0.3 }}
+        transition={{ delay: 0.2, duration: 0.8 }}
+        className="max-w-2xl mx-auto"
       >
-        <Card className="shadow-card">
-          <CardContent className="p-6">
-            <div className="flex flex-col md:flex-row gap-4">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-                <Input
-                  placeholder="Search by name or booking ID..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
+        <Card className="shadow-xl border-0 rounded-2xl overflow-hidden">
+          <CardHeader className="bg-gradient-to-r from-primary/5 to-water-blue/5 pb-8">
+            <CardTitle className="text-2xl text-center">Book Your Tickets</CardTitle>
+          </CardHeader>
+          <CardContent className="p-8 space-y-8">
+            {/* Ticket Type Selection */}
+            <div className="space-y-4">
+              <Label className="text-lg font-semibold">Choose Your Experience</Label>
+              <div className="grid gap-4">
+                {ticketTypes.map((type) => {
+                  const IconComponent = type.icon;
+                  return (
+                    <motion.div
+                      key={type.id}
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                    >
+                      <Card 
+                        className={cn(
+                          "cursor-pointer transition-all duration-200 hover:shadow-lg rounded-xl",
+                          ticketType === type.id 
+                            ? "ring-2 ring-primary bg-primary/5" 
+                            : "hover:bg-muted/30"
+                        )}
+                        onClick={() => setTicketType(type.id)}
+                      >
+                        <CardContent className="p-4 flex items-center gap-4">
+                          <div className={cn(
+                            "p-3 rounded-xl",
+                            type.id === "water-park" && "bg-water-light text-water-blue",
+                            type.id === "agro-tour" && "bg-agro-light text-agro-green", 
+                            type.id === "combo" && "bg-primary/10 text-primary"
+                          )}>
+                            <IconComponent className="h-6 w-6" />
+                          </div>
+                          <div className="flex-1">
+                            <h3 className="font-semibold">{type.name}</h3>
+                            <p className="text-sm text-muted-foreground">{type.description}</p>
+                          </div>
+                          {ticketType === type.id && ticketPrices[type.id as keyof typeof ticketPrices] && (
+                            <div className="text-right">
+                              <div className="text-sm text-muted-foreground">Adult: ${ticketPrices[type.id as keyof typeof ticketPrices].adult}</div>
+                              <div className="text-sm text-muted-foreground">Child: ${ticketPrices[type.id as keyof typeof ticketPrices].child}</div>
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    </motion.div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Date Selection */}
+            <div className="space-y-4">
+              <Label className="text-lg font-semibold">Select Date</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "w-full justify-start text-left font-normal h-12 rounded-xl",
+                      !date && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {date ? format(date, "PPP") : <span>Pick a date</span>}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={date}
+                    onSelect={setDate}
+                    disabled={(date) => date < new Date()}
+                    initialFocus
+                    className="pointer-events-auto"
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+
+            {/* Guest Count */}
+            <div className="space-y-4">
+              <Label className="text-lg font-semibold">Number of Guests</Label>
+              <div className="space-y-3">
+                <Counter
+                  label="Adults (13+ years)"
+                  value={adults}
+                  onChange={setAdults}
+                  min={1}
+                />
+                <Counter
+                  label="Children (3-12 years)"
+                  value={children}
+                  onChange={setChildren}
                 />
               </div>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-full md:w-48">
-                  <SelectValue placeholder="Filter by status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="confirmed">Confirmed</SelectItem>
-                  <SelectItem value="cancelled">Cancelled</SelectItem>
-                </SelectContent>
-              </Select>
-              <Select value={typeFilter} onValueChange={setTypeFilter}>
-                <SelectTrigger className="w-full md:w-48">
-                  <SelectValue placeholder="Filter by type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Types</SelectItem>
-                  <SelectItem value="Water Park">Water Park</SelectItem>
-                  <SelectItem value="Agro Tour">Agro Tour</SelectItem>
-                  <SelectItem value="Combo Package">Combo Package</SelectItem>
-                </SelectContent>
-              </Select>
-              <Button variant="outline" className="gap-2">
-                <Download className="w-4 h-4" />
-                Export
-              </Button>
             </div>
+
+            {/* Price Summary */}
+            {ticketType && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-gradient-to-r from-primary/5 to-water-blue/5 p-6 rounded-xl"
+              >
+                <div className="flex justify-between items-center mb-4">
+                  <span className="text-lg font-semibold">Total Price</span>
+                  <span className="text-3xl font-bold text-primary">${totalPrice}</span>
+                </div>
+                {ticketPrices[ticketType as keyof typeof ticketPrices] && (
+                  <div className="text-sm text-muted-foreground space-y-1">
+                    {adults > 0 && (
+                      <div className="flex justify-between">
+                        <span>{adults} Adult{adults > 1 ? 's' : ''} × ${ticketPrices[ticketType as keyof typeof ticketPrices].adult}</span>
+                        <span>${adults * ticketPrices[ticketType as keyof typeof ticketPrices].adult}</span>
+                      </div>
+                    )}
+                    {children > 0 && (
+                      <div className="flex justify-between">
+                        <span>{children} Child{children > 1 ? 'ren' : ''} × ${ticketPrices[ticketType as keyof typeof ticketPrices].child}</span>
+                        <span>${children * ticketPrices[ticketType as keyof typeof ticketPrices].child}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </motion.div>
+            )}
+
+            {/* Book Now Button */}
+            <Button
+              onClick={handleBookNow}
+              disabled={!ticketType || !date || totalPrice === 0}
+              className="w-full h-12 text-lg font-semibold rounded-xl bg-gradient-to-r from-primary to-water-blue hover:from-primary/90 hover:to-water-blue/90 transition-all duration-300"
+            >
+              Book Now - ${totalPrice}
+            </Button>
           </CardContent>
         </Card>
       </motion.div>
 
-      {/* Bookings Table */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.2, duration: 0.3 }}
-      >
-        <Card className="shadow-card">
-          <CardHeader>
-            <CardTitle>Recent Bookings</CardTitle>
-            <CardDescription>
-              Showing {filteredBookings.length} of {bookingsData.length} bookings
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="rounded-lg border overflow-hidden">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-muted/50">
-                    <TableHead>Booking ID</TableHead>
-                    <TableHead>Customer</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Guests</TableHead>
-                    <TableHead>Amount</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredBookings.map((booking, index) => (
-                    <motion.tr
-                      key={booking.id}
-                      initial={{ opacity: 0, x: -20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: index * 0.05, duration: 0.3 }}
-                      className="hover:bg-muted/30 transition-colors"
-                    >
-                      <TableCell className="font-medium">{booking.id}</TableCell>
-                      <TableCell>
-                        <div>
-                          <p className="font-medium">{booking.name}</p>
-                          <p className="text-sm text-muted-foreground">{booking.email}</p>
-                        </div>
-                      </TableCell>
-                      <TableCell>{getTypeBadge(booking.type)}</TableCell>
-                      <TableCell>{booking.date}</TableCell>
-                      <TableCell>{booking.guests}</TableCell>
-                      <TableCell className="font-medium">{booking.amount}</TableCell>
-                      <TableCell>{getStatusBadge(booking.status)}</TableCell>
-                      <TableCell>
-                        <Button variant="ghost" size="sm" className="gap-2">
-                          <Eye className="w-4 h-4" />
-                          View
-                        </Button>
-                      </TableCell>
-                    </motion.tr>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
-        </Card>
-      </motion.div>
+      {/* Booking Success Dialog */}
+      <Dialog open={showBookingDialog} onOpenChange={setShowBookingDialog}>
+        <DialogContent className="max-w-md rounded-2xl">
+          <DialogHeader className="text-center space-y-4">
+            {!bookingSuccess ? (
+              <>
+                <div className="mx-auto w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center">
+                  <motion.div
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                    className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full"
+                  />
+                </div>
+                <DialogTitle>Processing Your Booking...</DialogTitle>
+                <DialogDescription>
+                  Please wait while we confirm your reservation.
+                </DialogDescription>
+              </>
+            ) : (
+              <>
+                <motion.div
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
+                  className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center"
+                >
+                  <CheckCircle className="w-8 h-8 text-green-600" />
+                </motion.div>
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.4 }}
+                >
+                  <DialogTitle className="text-green-700">Booking Confirmed!</DialogTitle>
+                  <DialogDescription className="space-y-4">
+                    <p>Your tickets have been successfully booked.</p>
+                    <div className="bg-muted/50 p-4 rounded-xl text-left space-y-2">
+                      <div className="flex justify-between">
+                        <span>Booking ID:</span>
+                        <span className="font-mono">BK{Math.random().toString().substr(2, 6)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Date:</span>
+                        <span>{date && format(date, "PPP")}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Guests:</span>
+                        <span>{adults + children} ({adults} adults, {children} children)</span>
+                      </div>
+                      <div className="flex justify-between font-semibold">
+                        <span>Total:</span>
+                        <span>${totalPrice}</span>
+                      </div>
+                    </div>
+                    <p className="text-sm">A confirmation email has been sent to your address.</p>
+                  </DialogDescription>
+                  <div className="flex gap-3 mt-6">
+                    <Button variant="outline" onClick={resetForm} className="flex-1">
+                      Book Another
+                    </Button>
+                    <Button onClick={() => setShowBookingDialog(false)} className="flex-1">
+                      Done
+                    </Button>
+                  </div>
+                </motion.div>
+              </>
+            )}
+          </DialogHeader>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
