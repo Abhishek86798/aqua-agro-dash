@@ -56,6 +56,7 @@ const activityData = [
 ];
 
 export default function Dashboard() {
+  console.log("Dashboard component is rendering!");
   return (
     <div className="space-y-6">
       {/* Header */}
